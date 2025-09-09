@@ -66,11 +66,6 @@ const Home = () => {
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [dates, setDates] = useState<DateList>(() => initialDate);
 
-  const displayEndDate =
-    new Date(dates.endDate).getTime() < new Date(dates.startDate).getTime()
-      ? dates.startDate
-      : dates.endDate;
-
   // TanStack Query for fetching todos
   const {
     data: scheduleData,
@@ -199,7 +194,19 @@ const Home = () => {
     if (scheduleType !== 'upcoming') {
       setDates(() => initialDate);
     }
-    queryClient.invalidateQueries({ queryKey: ['todos'] });
+    queryClient.invalidateQueries({
+      queryKey: [
+        'todos',
+        {
+          scheduleType,
+          completed,
+          priority,
+          dates,
+          sort,
+          order,
+        },
+      ],
+    });
   }, [
     scheduleType,
     priority,
@@ -242,7 +249,6 @@ const Home = () => {
           <UpcomingOption
             dates={dates}
             setDates={setDates}
-            displayEndDate={displayEndDate}
             currentUTCDate={currentUTCDate}
           />
         )}
@@ -641,7 +647,7 @@ const ScheduleTitle: React.FC<ScheduleTitleProps> = ({
           </div>
         </div>
 
-        {scheduleType !== 'completed' && (
+        {scheduleType === 'today' && (
           <p className='custom-text-sm-regular sub-text'>
             {formattedDate || 'Loading...'}
           </p>
@@ -654,14 +660,12 @@ const ScheduleTitle: React.FC<ScheduleTitleProps> = ({
 type UpcomingOptionProps = {
   dates: DateList;
   setDates: Dispatch<SetStateAction<DateList>>;
-  displayEndDate: string;
   currentUTCDate: string;
 };
 
 const UpcomingOption: React.FC<UpcomingOptionProps> = ({
   dates,
   setDates,
-  displayEndDate,
   currentUTCDate,
 }) => {
   const formattedDateString = (date: string) => {
@@ -670,6 +674,40 @@ const UpcomingOption: React.FC<UpcomingOptionProps> = ({
 
   const formatDateForInput = (iso: string) => {
     return dayjs(iso).format('YYYY-MM-DD');
+  };
+
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = dayjs(e.target.value).startOf('day').toISOString();
+
+    setDates((prev) => {
+      const newDates = {
+        ...prev,
+        startDate: selectedDate,
+      };
+
+      if (dayjs(selectedDate).isAfter(dayjs(prev.endDate))) {
+        newDates.endDate = dayjs(selectedDate).endOf('day').toISOString();
+      }
+
+      return newDates;
+    });
+  };
+
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = dayjs(e.target.value).endOf('day').toISOString();
+
+    setDates((prev) => {
+      const adjustedEndDate = dayjs(selectedDate).isBefore(
+        dayjs(prev.startDate)
+      )
+        ? dayjs(prev.startDate).endOf('day').toISOString()
+        : selectedDate;
+
+      return {
+        ...prev,
+        endDate: adjustedEndDate,
+      };
+    });
   };
 
   return (
@@ -691,15 +729,7 @@ const UpcomingOption: React.FC<UpcomingOptionProps> = ({
               className='absolute inset-0 h-full w-full opacity-0'
               value={formatDateForInput(dates.startDate)}
               min={formatDateForInput(currentUTCDate)}
-              onChange={(e) =>
-                setDates((prev) => {
-                  const selectedDate = dayjs(e.target.value)
-                    .startOf('day')
-                    .toISOString();
-
-                  return { ...prev, startDate: selectedDate };
-                })
-              }
+              onChange={handleStartDateChange}
               onInput={(e) => {
                 if (!e.currentTarget.value) {
                   e.currentTarget.value = formatDateForInput(dates.startDate);
@@ -717,7 +747,7 @@ const UpcomingOption: React.FC<UpcomingOptionProps> = ({
 
         <div className='flex items-center gap-2'>
           <p className='custom-text-sm-regular md:custom-text-md-regular text-start'>
-            {formattedDateString(displayEndDate)}
+            {formattedDateString(dates.endDate)}
           </p>
 
           <div className='relative flex cursor-pointer items-center justify-center'>
@@ -727,21 +757,7 @@ const UpcomingOption: React.FC<UpcomingOptionProps> = ({
               className='absolute inset-0 h-full w-full opacity-0'
               value={formatDateForInput(dates.endDate)}
               min={formatDateForInput(dates.startDate)}
-              onChange={(e) =>
-                setDates((prev) => {
-                  let selectedDate = dayjs(e.target.value)
-                    .endOf('day')
-                    .toISOString();
-
-                  if (dayjs(selectedDate).isBefore(dayjs(prev.startDate))) {
-                    selectedDate = dayjs(prev.startDate)
-                      .endOf('day')
-                      .toISOString();
-                  }
-
-                  return { ...prev, endDate: selectedDate };
-                })
-              }
+              onChange={handleEndDateChange}
               onInput={(e) => {
                 if (!e.currentTarget.value) {
                   e.currentTarget.value = formatDateForInput(dates.startDate);
