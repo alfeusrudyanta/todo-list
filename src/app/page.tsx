@@ -65,6 +65,7 @@ const Home = () => {
   const [isAddNewSchedule, setIsAddNewSchedule] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [dates, setDates] = useState<DateList>(() => initialDate);
+  const [isCardLoadingId, setIsCardLoadingId] = useState<string>('');
 
   // TanStack Query for fetching todos
   const {
@@ -118,6 +119,7 @@ const Home = () => {
 
   const deleteScheduleMutation = useMutation({
     mutationFn: (id: string) => api.deleteTodos(id),
+    onMutate: (id: string) => setIsCardLoadingId(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['todos'] });
       SoonerCardSuccess('Task removed');
@@ -126,6 +128,7 @@ const Home = () => {
       console.error('Failed to delete:', error);
       SoonerCardError('Failed to remove task. Please try again');
     },
+    onSettled: () => setIsCardLoadingId(''),
   });
 
   const addNewSchedule = async () => {
@@ -258,7 +261,7 @@ const Home = () => {
           {schedule
             .filter(
               (prev) =>
-                prev.title.includes(search) &&
+                prev.title.toLowerCase().includes(search.toLowerCase()) &&
                 (priority ? prev.priority === priority : true)
             )
             .map((item) => (
@@ -271,6 +274,8 @@ const Home = () => {
                 date={item.date}
                 priority={item.priority}
                 handleDelete={handleDelete}
+                isCardLoadingId={isCardLoadingId}
+                setIsCardLoadingId={setIsCardLoadingId}
               />
             ))}
 

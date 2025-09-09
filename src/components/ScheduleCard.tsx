@@ -3,6 +3,8 @@
 import dayjs from 'dayjs'; // Add dayjs import
 import { Ellipsis, Pencil, Trash2 } from 'lucide-react';
 import React, {
+  Dispatch,
+  SetStateAction,
   useCallback,
   useEffect,
   useMemo,
@@ -16,12 +18,14 @@ import type { ScheduleCard } from '@/types/Schedule';
 
 import { Button } from './ui/button';
 import DialogCard from './ui/DialogCard';
-import { SoonerCardSuccess } from './ui/SoonerCard';
+import { SoonerCardError, SoonerCardSuccess } from './ui/SoonerCard';
 
 type ScheduleCardProps = ScheduleCard & {
   scheduleType: 'today' | 'upcoming' | 'completed';
   isBlur?: boolean;
   handleDelete: (id: string) => Promise<void>;
+  isCardLoadingId: string;
+  setIsCardLoadingId: Dispatch<SetStateAction<string>>;
 };
 
 const ScheduleCard: React.FC<ScheduleCardProps> = ({
@@ -33,6 +37,8 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   scheduleType,
   isBlur = false,
   handleDelete,
+  isCardLoadingId,
+  setIsCardLoadingId,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -51,9 +57,10 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
     priority,
   });
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isEditOpen, setIsEditOpen] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
+
+  const isLoading = isCardLoadingId === id;
 
   const formattedDateString = useMemo(
     () => dayjs(scheduleData.date).format('MMM D, YYYY'),
@@ -74,7 +81,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   }, [scheduleData.priority]);
 
   const updateCompletedSchedule = useCallback(async () => {
-    setIsLoading(true);
+    setIsCardLoadingId(id);
     try {
       const updateData = await api.putTodos(id, {
         title: scheduleData.title,
@@ -86,7 +93,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
     } catch (error) {
       console.error('Failed to update schedule: ', error);
     } finally {
-      setIsLoading(false);
+      setIsCardLoadingId('');
     }
   }, [
     id,
@@ -94,14 +101,15 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
     scheduleData.completed,
     scheduleData.date,
     scheduleData.priority,
+    setIsCardLoadingId,
   ]);
 
   const updateSchedule = useCallback(async () => {
-    setIsLoading(true);
+    setIsCardLoadingId(id);
 
     if (!tempScheduleData.title.trim()) {
       setErrorMessage('Task title is required.');
-      setIsLoading(false);
+      setIsCardLoadingId('');
       return;
     }
 
@@ -112,7 +120,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
       tempScheduleData.priority === scheduleData.priority
     ) {
       setErrorMessage('No changes detected. Please update at least one field.');
-      setIsLoading(false);
+      setIsCardLoadingId('');
       return;
     }
 
@@ -130,12 +138,12 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
       setIsMenuOpen(false);
       SoonerCardSuccess('Changes saved');
     } catch (error) {
-      SoonerCardSuccess('Failed to update task. Please try again');
+      SoonerCardError('Failed to update task. Please try again');
       console.error('Failed to update task: ', error);
     } finally {
-      setIsLoading(false);
+      setIsCardLoadingId('');
     }
-  }, [tempScheduleData, scheduleData]);
+  }, [tempScheduleData, scheduleData, id, setIsCardLoadingId]);
 
   const openEditDialog = useCallback(() => {
     setIsEditOpen(true);
