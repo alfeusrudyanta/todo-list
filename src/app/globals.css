@@ -189,7 +189,7 @@
 body {
   @apply bg-base-white dark:bg-base-background dark:text-neutral-25 text-neutral-950;
 
-  font-family: var(--font-poppins);
+  font-family: var(--font-sfpro);
 }
 
 .border-bg {

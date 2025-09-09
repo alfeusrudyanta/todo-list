@@ -128,7 +128,7 @@ const Home = () => {
       console.error('Failed to delete:', error);
       SoonerCardError('Failed to remove task. Please try again');
     },
-    onSettled: () => setIsCardLoadingId(''),
+    onSettled: () => setIsCardLoadingId('id'),
   });
 
   const addNewSchedule = async () => {
