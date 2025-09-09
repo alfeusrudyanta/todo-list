@@ -1,5 +1,6 @@
 'use client';
 
+import dayjs from 'dayjs'; // Add dayjs import
 import { Ellipsis, Pencil, Trash2 } from 'lucide-react';
 import React, {
   useCallback,
@@ -55,13 +56,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const formattedDateString = useMemo(
-    () =>
-      new Date(scheduleData.date).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        timeZone: 'UTC',
-      }),
+    () => dayjs(scheduleData.date).format('MMM D, YYYY'),
     [scheduleData.date]
   );
 

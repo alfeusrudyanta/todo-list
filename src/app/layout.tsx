@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Poppins } from 'next/font/google';
 import './globals.css';
 
+import ReactQueryProvider from '@/components/providers/ReactQueryProvider';
 import { Toaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
@@ -19,14 +20,16 @@ const poppins = Poppins({
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang='en'>
       <body className={clsx(poppins.variable, 'antialiased')}>
-        {children}
-        <Toaster position='top-right' closeButton />
+        <ReactQueryProvider>
+          {children}
+          <Toaster position='top-right' closeButton />
+        </ReactQueryProvider>
       </body>
     </html>
   );

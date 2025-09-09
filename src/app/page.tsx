@@ -1,5 +1,7 @@
 'use client';
 
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import dayjs from 'dayjs';
 import {
   ListFilter,
   Search,
@@ -7,15 +9,7 @@ import {
   CircleCheck,
   Calendar,
 } from 'lucide-react';
-import {
-  Dispatch,
-  SetStateAction,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
 
 import ScheduleCard from '@/components/ScheduleCard';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -23,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import DialogCard from '@/components/ui/DialogCard';
 import { SoonerCardError, SoonerCardSuccess } from '@/components/ui/SoonerCard';
 
+import useInfiniteTodos from '@/hooks/useInfiniteTodos';
 import useResponsiveToggle from '@/hooks/useResponsiveToggle';
 import { getStorageTheme, setDarkMode } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -37,68 +32,25 @@ type Sort = undefined | 'id' | 'title' | 'completed' | 'date' | 'priority';
 type Order = 'asc' | 'desc';
 
 const Home = () => {
-  // Ref
-  const isFetchingRef = useRef(false);
+  const queryClient = useQueryClient();
 
   // Memorize
-  const currentDate: Date = useMemo(() => new Date(), []);
-  const currentUTCDate: string = new Date(
-    Date.UTC(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      currentDate.getDate(),
-      0,
-      0,
-      0,
-      0
-    )
-  ).toISOString();
+  const currentUTCDate: string = dayjs().startOf('day').toISOString();
 
   const initialDate = useMemo(() => {
-    const startDate = new Date(
-      Date.UTC(
-        currentDate.getUTCFullYear(),
-        currentDate.getUTCMonth(),
-        currentDate.getUTCDate(),
-        0,
-        0,
-        0,
-        0
-      )
-    ).toISOString();
-
-    const endDate = new Date(
-      Date.UTC(
-        currentDate.getUTCFullYear(),
-        currentDate.getUTCMonth(),
-        currentDate.getUTCDate(),
-        23,
-        59,
-        59,
-        999
-      )
-    ).toISOString();
+    const startDate = dayjs().startOf('day').toISOString();
+    const endDate = dayjs().endOf('day').toISOString();
 
     return {
       startDate,
       endDate,
-      formattedDate: currentDate.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        timeZone: 'UTC',
-      }),
+      formattedDate: dayjs().format('MMM D, YYYY'),
     };
-  }, [currentDate]);
+  }, []);
 
   // State
   const [search, setSearch] = useState<string>('');
   const [scheduleType, setScheduleType] = useState<ScheduleType>('today');
-  const [schedule, setSchedule] = useState<PostTodosResponse[]>([]);
-  const [totalItem, setTotalItem] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [nextPageRequest, setNextPageRequest] = useState<number>(1);
-  const [hasNextPage, setHasNextPage] = useState<boolean>(true);
   const [completed, setCompleted] = useState<IsCompleted>(undefined);
   const [priority, setPriority] = useState<Priority>(undefined);
   const [sort, setSort] = useState<Sort>(undefined);
@@ -119,69 +71,41 @@ const Home = () => {
       ? dates.startDate
       : dates.endDate;
 
-  // Function
-  const fetchData = useCallback(
-    async (page: number) => {
-      if (!dates || isFetchingRef.current) return;
-      if (!hasNextPage) return;
+  // TanStack Query for fetching todos
+  const {
+    data: scheduleData,
+    isLoading,
+    isFetching,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteTodos({
+    scheduleType,
+    completed,
+    priority,
+    dates,
+    sort,
+    order,
+  });
 
-      isFetchingRef.current = true;
-      setIsLoading(true);
-      try {
-        const data = await api.getTodos({
-          completed: scheduleType === 'completed' ? true : completed,
-          priority: priority,
-          dateGte: scheduleType === 'completed' ? undefined : dates.startDate,
-          dateLte: scheduleType === 'completed' ? undefined : dates.endDate,
-          page: page,
-          sort: sort,
-          order: order,
-        });
+  const schedule = useMemo(() => {
+    return scheduleData?.pages.flatMap((page) => page.todos) || [];
+  }, [scheduleData]);
 
-        setSchedule((prev) => {
-          if (page === 1) return data.todos;
+  const totalItem = useMemo(() => {
+    return scheduleData?.pages[0].totalTodos || 0;
+  }, [scheduleData]);
 
-          const existingIds = new Set(prev.map((item) => item.id));
-          const newItems = data.todos.filter(
-            (item) => !existingIds.has(item.id)
-          );
-          return [...prev, ...newItems];
-        });
-
-        setHasNextPage(data.hasNextPage);
-        setTotalItem(data.totalTodos);
-      } catch (error) {
-        console.error('Failed to fetch data: ', error);
-      } finally {
-        setIsLoading(false);
-        isFetchingRef.current = false;
-      }
-    },
-    [dates, priority, hasNextPage, order, scheduleType, sort, completed]
-  );
-
-  const addNewSchedule = async () => {
-    if (isLoading) return;
-    if (!newSchedule.title.trim()) {
-      return setErrorMessage('Title cannot be left blank.');
-    }
-
-    setErrorMessage('');
-    setIsLoading(true);
-
-    try {
-      await api.postTodos({
-        title: newSchedule.title.trim(),
-        completed: false,
-        date: newSchedule.date,
-        priority: newSchedule.priority,
-      });
-
-      setSchedule([]);
-      setNextPageRequest(1);
-      setHasNextPage(true);
-      fetchData(1);
-
+  // TanStack Query mutations
+  const addScheduleMutation = useMutation({
+    mutationFn: (data: {
+      title: string;
+      completed: boolean;
+      date: string;
+      priority: 'LOW' | 'MEDIUM' | 'HIGH';
+    }) => api.postTodos(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+      SoonerCardSuccess('Task added');
       setNewSchedule({
         id: 'DUMMY_ID',
         title: '',
@@ -189,83 +113,45 @@ const Home = () => {
         date: currentUTCDate,
         priority: 'LOW',
       });
-      SoonerCardSuccess('Task added');
-    } catch (error) {
+      setIsAddNewSchedule(false);
+    },
+    onError: (error) => {
       console.error('Failed to add new task: ', error);
       SoonerCardError('Failed to create task. Please try again');
-    } finally {
-      setIsLoading(false);
-      setIsAddNewSchedule(false);
+    },
+  });
+
+  const deleteScheduleMutation = useMutation({
+    mutationFn: (id: string) => api.deleteTodos(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+      SoonerCardSuccess('Task removed');
+    },
+    onError: (error) => {
+      console.error('Failed to delete:', error);
+      SoonerCardError('Failed to remove task. Please try again');
+    },
+  });
+
+  const addNewSchedule = async () => {
+    if (!newSchedule.title.trim()) {
+      return setErrorMessage('Title cannot be left blank.');
     }
+
+    setErrorMessage('');
+    addScheduleMutation.mutate({
+      title: newSchedule.title.trim(),
+      completed: false,
+      date: newSchedule.date,
+      priority: newSchedule.priority ?? 'LOW',
+    });
   };
 
   const handleDelete = async (id: string) => {
-    if (isLoading || isFetchingRef.current) return;
-
-    isFetchingRef.current = true;
-    setIsLoading(true);
-
-    try {
-      await api.deleteTodos(id);
-      setTotalItem((prev) => prev - 1);
-      setSchedule((prev) => prev.filter((item) => item.id !== id));
-      SoonerCardSuccess('Task removed');
-    } catch (error) {
-      console.error('Failed to delete:', error);
-      SoonerCardError('Failed to remove task. Please try again');
-    } finally {
-      isFetchingRef.current = false;
-      setIsLoading(false);
-    }
+    deleteScheduleMutation.mutate(id);
   };
 
-  // UseEffect
-  // For reset schedule
-  useEffect(() => {
-    if (scheduleType !== 'upcoming') {
-      setDates(() => initialDate);
-    }
-
-    setSchedule([]);
-    setNextPageRequest(1);
-    setHasNextPage(true);
-  }, [
-    scheduleType,
-    priority,
-    completed,
-    sort,
-    order,
-    initialDate,
-    dates.startDate,
-    dates.endDate,
-  ]);
-
-  // For upcoming date
-  useEffect(() => {
-    const start = new Date(dates.startDate);
-    const end = new Date(dates.endDate);
-
-    if (end < start) {
-      const utcEndDate = new Date(
-        Date.UTC(
-          start.getUTCFullYear(),
-          start.getUTCMonth(),
-          start.getUTCDate(),
-          23,
-          59,
-          59,
-          999
-        )
-      );
-
-      setDates((prev) => ({
-        ...prev,
-        endDate: utcEndDate.toISOString(),
-      }));
-    }
-  }, [dates.startDate, dates.endDate]);
-
-  // For scrolling
+  // UseEffect for scrolling
   useEffect(() => {
     let scrollTimeout: NodeJS.Timeout;
     let lastScrollY = window.scrollY;
@@ -287,9 +173,9 @@ const Home = () => {
           scrollPosition >= pageHeight - 300 &&
           hasNextPage &&
           !isLoading &&
-          !isFetchingRef.current
+          !isFetching
         ) {
-          setNextPageRequest((prev) => prev + 1);
+          fetchNextPage();
         }
       }, 300);
     };
@@ -306,13 +192,24 @@ const Home = () => {
       window.removeEventListener('scroll', optimizedScrollHandler);
       if (scrollTimeout) clearTimeout(scrollTimeout);
     };
-  }, [hasNextPage, isLoading]);
+  }, [hasNextPage, isLoading, isFetching, fetchNextPage]);
 
+  // Reset page when filters change
   useEffect(() => {
-    if (nextPageRequest > 1 || schedule.length === 0) {
-      fetchData(nextPageRequest);
+    if (scheduleType !== 'upcoming') {
+      setDates(() => initialDate);
     }
-  }, [nextPageRequest, fetchData, schedule.length]);
+    queryClient.invalidateQueries({ queryKey: ['todos'] });
+  }, [
+    scheduleType,
+    priority,
+    completed,
+    sort,
+    order,
+    initialDate,
+    dates,
+    queryClient,
+  ]);
 
   return (
     <main className='flex flex-col items-center px-4 py-6 md:py-[104px]'>
@@ -371,7 +268,7 @@ const Home = () => {
               />
             ))}
 
-          {isLoading && (
+          {(isLoading || isFetching) && (
             <div className='flex h-12 w-full items-center justify-center'>
               <div className='h-8 w-8 animate-spin rounded-full border-b-2 border-blue-500' />
             </div>
@@ -423,7 +320,7 @@ const Home = () => {
           dialogTitle='Add Task'
           data={newSchedule}
           setData={setNewSchedule}
-          isLoading={isLoading}
+          isLoading={addScheduleMutation.isPending}
           currentFunction={addNewSchedule}
           errorMessage={errorMessage}
         />
@@ -457,7 +354,7 @@ const Header = () => {
       {/* Title */}
       <div className='flex flex-col gap-[2px]'>
         <p className='custom-text-xl-bold md:custom-display-sm-bold'>
-          What’s on Your Plan Today?
+          What&apos;s on Your Plan Today?
         </p>
         <p className='custom-text-sm-regular md:custom-text-md-regular sub-text'>
           Your productivity starts now.
@@ -473,6 +370,7 @@ const Header = () => {
     </header>
   );
 };
+
 type SearchBarProps = {
   search: string;
   scheduleType: ScheduleType;
@@ -767,20 +665,11 @@ const UpcomingOption: React.FC<UpcomingOptionProps> = ({
   currentUTCDate,
 }) => {
   const formattedDateString = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
+    return dayjs(date).format('MMM D, YYYY');
   };
 
   const formatDateForInput = (iso: string) => {
-    const d = new Date(iso);
-    const year = d.getUTCFullYear();
-    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(d.getUTCDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    return dayjs(iso).format('YYYY-MM-DD');
   };
 
   return (
@@ -804,12 +693,11 @@ const UpcomingOption: React.FC<UpcomingOptionProps> = ({
               min={formatDateForInput(currentUTCDate)}
               onChange={(e) =>
                 setDates((prev) => {
-                  const [y, m, d] = e.target.value.split('-').map(Number);
-                  const selectedDate = new Date(
-                    Date.UTC(y, m - 1, d, 0, 0, 0, 0)
-                  );
+                  const selectedDate = dayjs(e.target.value)
+                    .startOf('day')
+                    .toISOString();
 
-                  return { ...prev, startDate: selectedDate.toISOString() };
+                  return { ...prev, startDate: selectedDate };
                 })
               }
               onInput={(e) => {
@@ -841,12 +729,17 @@ const UpcomingOption: React.FC<UpcomingOptionProps> = ({
               min={formatDateForInput(dates.startDate)}
               onChange={(e) =>
                 setDates((prev) => {
-                  const [y, m, d] = e.target.value.split('-').map(Number);
-                  const selectedDate = new Date(
-                    Date.UTC(y, m - 1, d, 23, 59, 59, 999)
-                  );
+                  let selectedDate = dayjs(e.target.value)
+                    .endOf('day')
+                    .toISOString();
 
-                  return { ...prev, endDate: selectedDate.toISOString() };
+                  if (dayjs(selectedDate).isBefore(dayjs(prev.startDate))) {
+                    selectedDate = dayjs(prev.startDate)
+                      .endOf('day')
+                      .toISOString();
+                  }
+
+                  return { ...prev, endDate: selectedDate };
                 })
               }
               onInput={(e) => {

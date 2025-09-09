@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import { Calendar } from 'lucide-react';
 import React, { useMemo } from 'react';
 
@@ -25,7 +26,7 @@ const DialogCard: React.FC<DialogCardProps> = ({
     id: 'DUMMY_ID',
     title: '',
     completed: false,
-    date: new Date().toISOString(),
+    date: dayjs().toISOString(),
     priority: 'LOW',
   },
   setData,
@@ -101,12 +102,7 @@ const DialogCard: React.FC<DialogCardProps> = ({
 
             <div className='flex items-center'>
               <p className='custom-text-sm-regular md:custom-text-md-regular w-full text-start'>
-                {new Date(data.date).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  timeZone: 'UTC',
-                })}
+                {dayjs(data.date).format('MMMM D, YYYY')}
               </p>
 
               <div className='relative flex cursor-pointer items-center justify-center'>
@@ -114,18 +110,18 @@ const DialogCard: React.FC<DialogCardProps> = ({
                 <input
                   type='date'
                   className='absolute inset-0 h-full w-full opacity-0'
-                  value={new Date(data.date).toISOString().split('T')[0]}
+                  value={dayjs(data.date).format('YYYY-MM-DD')}
                   onChange={(e) =>
                     setData((prev) => ({
                       ...prev,
-                      date: new Date(e.target.value).toISOString(),
+                      date: dayjs(e.target.value).toISOString(),
                     }))
                   }
                   onInput={(e) => {
                     if (!e.currentTarget.value) {
-                      e.currentTarget.value = new Date(data.date)
-                        .toISOString()
-                        .split('T')[0];
+                      e.currentTarget.value = dayjs(data.date).format(
+                        'YYYY-MM-DD'
+                      );
                     }
                   }}
                 />
