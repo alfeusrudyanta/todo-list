@@ -1,6 +1,7 @@
 'use client';
 
-import dayjs from 'dayjs'; // Add dayjs import
+import { useQueryClient, useMutation } from '@tanstack/react-query';
+import dayjs from 'dayjs';
 import { Ellipsis, Pencil, Trash2 } from 'lucide-react';
 import React, {
   Dispatch,
@@ -41,6 +42,7 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
   setIsCardLoadingId,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   const [scheduleData, setScheduleData] = useState<ScheduleCard>({
     id,
@@ -80,36 +82,56 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
     }
   }, [scheduleData.priority]);
 
-  const updateCompletedSchedule = useCallback(async () => {
-    setIsCardLoadingId(id);
-    try {
-      const updateData = await api.putTodos(id, {
+  const updateCompletedMutation = useMutation({
+    mutationFn: () =>
+      api.putTodos(id, {
         title: scheduleData.title,
         completed: !scheduleData.completed,
         date: scheduleData.date,
         priority: scheduleData.priority,
-      });
+      }),
+    onMutate: () => setIsCardLoadingId(id),
+    onSuccess: (updateData) => {
       setScheduleData(updateData);
-    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+    },
+    onError: (error) => {
       console.error('Failed to update schedule: ', error);
-    } finally {
-      setIsCardLoadingId('');
-    }
-  }, [
-    id,
-    scheduleData.title,
-    scheduleData.completed,
-    scheduleData.date,
-    scheduleData.priority,
-    setIsCardLoadingId,
-  ]);
+      SoonerCardError('Failed to update task status');
+    },
+    onSettled: () => setIsCardLoadingId(''),
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: () =>
+      api.putTodos(tempScheduleData.id, {
+        title: tempScheduleData.title.trim(),
+        completed: tempScheduleData.completed,
+        date: tempScheduleData.date,
+        priority: tempScheduleData.priority,
+      }),
+    onMutate: () => setIsCardLoadingId(id),
+    onSuccess: (updateData) => {
+      setScheduleData(updateData);
+      setIsEditOpen(false);
+      setIsMenuOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['todos'] });
+      SoonerCardSuccess('Changes saved');
+    },
+    onError: (error) => {
+      SoonerCardError('Failed to update task. Please try again');
+      console.error('Failed to update task: ', error);
+    },
+    onSettled: () => setIsCardLoadingId(''),
+  });
+
+  const updateCompletedSchedule = useCallback(async () => {
+    updateCompletedMutation.mutate();
+  }, [updateCompletedMutation]);
 
   const updateSchedule = useCallback(async () => {
-    setIsCardLoadingId(id);
-
     if (!tempScheduleData.title.trim()) {
       setErrorMessage('Task title is required.');
-      setIsCardLoadingId('');
       return;
     }
 
@@ -120,30 +142,12 @@ const ScheduleCard: React.FC<ScheduleCardProps> = ({
       tempScheduleData.priority === scheduleData.priority
     ) {
       setErrorMessage('No changes detected. Please update at least one field.');
-      setIsCardLoadingId('');
       return;
     }
 
     setErrorMessage('');
-
-    try {
-      const updateData = await api.putTodos(tempScheduleData.id, {
-        title: tempScheduleData.title.trim(),
-        completed: tempScheduleData.completed,
-        date: tempScheduleData.date,
-        priority: tempScheduleData.priority,
-      });
-      setScheduleData(updateData);
-      setIsEditOpen(false);
-      setIsMenuOpen(false);
-      SoonerCardSuccess('Changes saved');
-    } catch (error) {
-      SoonerCardError('Failed to update task. Please try again');
-      console.error('Failed to update task: ', error);
-    } finally {
-      setIsCardLoadingId('');
-    }
-  }, [tempScheduleData, scheduleData, id, setIsCardLoadingId]);
+    updateTaskMutation.mutate();
+  }, [tempScheduleData, scheduleData, updateTaskMutation]);
 
   const openEditDialog = useCallback(() => {
     setIsEditOpen(true);

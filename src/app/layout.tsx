@@ -1,10 +1,11 @@
 import clsx from 'clsx';
-import type { Metadata } from 'next';
-import localFont from 'next/font/local';
 import './globals.css';
+import { Metadata } from 'next';
+import localFont from 'next/font/local';
 
-import ReactQueryProvider from '@/components/providers/ReactQueryProvider';
 import { Toaster } from '@/components/ui/sonner';
+
+import Providers from '@/providers/Providers';
 
 export const metadata: Metadata = {
   title: 'Create Next App',
@@ -51,10 +52,10 @@ export default function RootLayout({
   return (
     <html lang='en'>
       <body className={clsx(sfPro.variable, 'antialiased')}>
-        <ReactQueryProvider>
+        <Providers>
           {children}
           <Toaster position='top-right' closeButton />
-        </ReactQueryProvider>
+        </Providers>
       </body>
     </html>
   );
