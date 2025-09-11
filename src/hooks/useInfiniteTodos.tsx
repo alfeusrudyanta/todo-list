@@ -43,6 +43,7 @@ function useInfiniteTodos({
       return lastPage.hasNextPage ? allPages.length + 1 : undefined;
     },
     initialPageParam: 1,
+    gcTime: 0,
   });
 }
 
