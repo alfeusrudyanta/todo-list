@@ -31,7 +31,7 @@ function useInfiniteTodos({
     ],
     queryFn: ({ pageParam = 1 }) =>
       api.getTodos({
-        completed: completed,
+        completed: scheduleType === 'completed' ? true : completed,
         priority: priority,
         dateGte: dates.startDate,
         dateLte: dates.endDate,
