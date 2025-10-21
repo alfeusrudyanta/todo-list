@@ -54,7 +54,7 @@ export default function RootLayout({
       <body className={clsx(sfPro.variable, 'antialiased')}>
         <Providers>
           {children}
-          <Toaster position='top-right' closeButton />
+          <Toaster position='top-right' />
         </Providers>
       </body>
     </html>

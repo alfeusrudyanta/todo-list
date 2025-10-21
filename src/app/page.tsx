@@ -11,15 +11,13 @@ import {
 } from 'lucide-react';
 import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
 
+import Header from '@/components/Header';
 import ScheduleCard from '@/components/ScheduleCard';
-import ThemeToggle from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import DialogCard from '@/components/ui/DialogCard';
 import { SoonerCardError, SoonerCardSuccess } from '@/components/ui/SoonerCard';
 
 import useInfiniteTodos from '@/hooks/useInfiniteTodos';
-import useResponsiveToggle from '@/hooks/useResponsiveToggle';
-import { getStorageTheme, setDarkMode } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import api from '@/services/api';
 import { PostTodosResponse } from '@/types/Schedule';
@@ -341,46 +339,6 @@ const Home = () => {
 };
 
 export default Home;
-
-const Header = () => {
-  const { isMobile } = useResponsiveToggle();
-  const [onDarkMode, setOnDarkMode] = useState<boolean>(false);
-
-  useEffect(() => {
-    const stored = getStorageTheme();
-    if (stored === 'dark') {
-      setOnDarkMode(true);
-      setDarkMode(true);
-    }
-  }, []);
-
-  const toggle = () => {
-    const nextValue = !onDarkMode;
-    setOnDarkMode(nextValue);
-    setDarkMode(nextValue);
-  };
-
-  return (
-    <header className='flex w-full items-center justify-between'>
-      {/* Title */}
-      <div className='flex flex-col gap-[2px]'>
-        <p className='custom-text-xl-bold md:custom-display-sm-bold'>
-          What&apos;s on Your Plan Today?
-        </p>
-        <p className='custom-text-sm-regular md:custom-text-md-regular sub-text'>
-          Your productivity starts now.
-        </p>
-      </div>
-
-      {/* Background Icon Selector */}
-      <ThemeToggle
-        onDarkMode={onDarkMode}
-        toggle={toggle}
-        isMobile={isMobile}
-      />
-    </header>
-  );
-};
 
 type SearchBarProps = {
   search: string;
