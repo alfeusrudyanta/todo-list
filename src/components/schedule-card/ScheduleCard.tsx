@@ -17,9 +17,9 @@ import { cn } from '@/lib/utils';
 import api from '@/services/api';
 import type { ScheduleCard } from '@/types/Schedule';
 
-import { Button } from './ui/button';
-import DialogCard from './ui/DialogCard';
-import { SoonerCardError, SoonerCardSuccess } from './ui/SoonerCard';
+import { Button } from '../ui/button';
+import DialogCard from '../ui/DialogCard';
+import { SoonerCardError, SoonerCardSuccess } from '../ui/SoonerCard';
 
 type ScheduleCardProps = ScheduleCard & {
   scheduleType: 'today' | 'upcoming' | 'completed';

@@ -11,8 +11,8 @@ import {
 } from 'lucide-react';
 import { Dispatch, SetStateAction, useEffect, useMemo, useState } from 'react';
 
-import Header from '@/components/Header';
-import ScheduleCard from '@/components/ScheduleCard';
+import Header from '@/components/header';
+import ScheduleCard from '@/components/schedule-card';
 import { Button } from '@/components/ui/button';
 import DialogCard from '@/components/ui/DialogCard';
 import { SoonerCardError, SoonerCardSuccess } from '@/components/ui/SoonerCard';
